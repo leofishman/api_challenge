@@ -1,6 +1,10 @@
 const express = require('express');
 const api = express.Router();
-const validPairs = ['BTC-USD','ETH-USD'];
+
+const validPairs = [
+    'BTC-USD',
+    'ETH-USD'
+];
 
 api.get('/', (req, res) => {
     res.json({'app':'Lattice API V1'});
@@ -12,7 +16,6 @@ api.get('/price/:op/:pair/:size',(req, res) => {
 
 api.get('/orderbook/:pair', (req, res) => {
     validatepair(req.params.pair) ? res.json({'pair': req.params.pair}) : res.json({'error':'invalid pair'});
-    
 });
 
 function validatepair(pair){
