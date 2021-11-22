@@ -3,14 +3,12 @@ const api = express.Router();
 const { get_book, get_orderbook } = require('../ws/book');
 
 
-//  let BTCUSD = get_book('BTCUSD')
-//  let ETHUSD = get_book('ETHUSD')
-
 api.get('/', (req, res) => {
     res.json({'app':'Lattice API V1'});
 });
 
 api.get('/price/:op/:pair/:size',(req, res) => {
+    // Create function to get price 
     validatepair(req.params.pair)
      ? res.json({'op': req.params.op,'pair': req.params.pair, 'size': req.params.size, 'pair': get_book(req.params.pair) }) 
      : res.json({'error':'invalid pair'});

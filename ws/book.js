@@ -12,18 +12,12 @@ node bfx_test_book.js BTCUSD
 
 const WS = require('ws')
 const _ = require('lodash')
-const fs = require('fs')
 const moment = require('moment')
 const CRC = require('crc-32')
-
-// const pair = 'BTCUSD'; //process.argv[2]
 
 const conf = {
   wshost: "wss://api.bitfinex.com/ws/2"
 }
-
-const book = [];
-
 
 let BOOK = [];
 
@@ -32,6 +26,7 @@ let connecting = false
 let cli
 let seq = null
 
+// TODO: Move this function to a service
 function get_pair_index(msg) {
   return _.findKey(BOOK, (o) => { return o.channel_id === msg[0] });
 }
@@ -47,7 +42,11 @@ function connect () {
     connecting = false
     connected = true
 
+    // Bulk updates with a flag value of 536870912. 
+    // With bulk updates enabled, updates will arrive as an array of arrays.
     cli.send(JSON.stringify({ event: 'conf', flags: 65536 + 131072 }))
+
+    // Subscribe to the orderbook for every pair
     global.validPairs.forEach( (pair) => {
         console.log(pair, BOOK)
         BOOK[pair] = {};
@@ -70,9 +69,11 @@ function connect () {
   cli.on('message', function (msg) {
     msg = JSON.parse(msg)
     if (msg.event == 'subscribed') {
+      // Asign the channel id to the pair array element
       BOOK[msg.pair].channel_id = msg.chanId;
     }
 
+  // TODO:
   // handle info events
   // Info Codes
 
@@ -113,7 +114,6 @@ function connect () {
       const cs_str = csdata.join(':')
       const cs_calc = CRC.str(cs_str)
 
-//        fs.appendFileSync(logfile, '[' + moment().format('YYYY-MM-DDTHH:mm:ss.SSS') + '] ' + pair + ' | ' + JSON.stringify(['cs_string=' + cs_str, 'cs_calc=' + cs_calc, 'server_checksum=' + checksum]) + '\n')
       if (cs_calc !== checksum) {
         console.error('CHECKSUM_FAILED')
         process.exit(-1)
@@ -121,19 +121,18 @@ function connect () {
       return
     }
 
-//      fs.appendFileSync(logfile, '[' + moment().format('YYYY-MM-DDTHH:mm:ss.SSS') + '] ' + pair + ' | ' + JSON.stringify(msg) + '\n')
-
     // find which pair has channel_id in BOOK
     const pair_index =  get_pair_index(msg);
     if (!pair_index) return
+
+    // psnap = price snapshot
+    // csdata = checksum data
+    // mcnt = message count
     if (BOOK[pair_index].mcnt === 0) {
       _.each(msg[1], function (pp) {
         pp = { price: pp[0], cnt: pp[1], amount: pp[2] }
         const side = pp.amount >= 0 ? 'bids' : 'asks'
         pp.amount = Math.abs(pp.amount)
-        if (BOOK[pair_index][side][pp.price]) {
-//            fs.appendFileSync(logfile, '[' + moment().format() + '] ' + pair + ' | ' + JSON.stringify(pp) + ' BOOK snap existing bid override\n')
-        }
         BOOK[pair_index][side][pp.price] = pp
       })
     } else {
@@ -170,9 +169,6 @@ function connect () {
           }
         }
 
-        if (!found) {
-//            fs.appendFileSync(logfile, '[' + moment().format() + '] ' + pair + ' | ' + JSON.stringify(pp) + ' BOOK delete fail side not found\n')
-        }
       } else {
         let side = pp.amount >= 0 ? 'bids' : 'asks'
         pp.amount = Math.abs(pp.amount)
@@ -196,24 +192,15 @@ function connect () {
     })
 
     BOOK[pair_index].mcnt++
-    // checkCross(msg)
+
   })
 }
 
 setInterval(function () {
+  // 3.5 seconds interval for reconnection in order to avoid passing the limit
   if (connected) return
   connect()
 }, 3500)
-
-function checkCross (msg) {
-  let bid = BOOK.psnap.bids[0]
-  let ask = BOOK.psnap.asks[0]
-  if (bid >= ask) {
-    let lm = [moment.utc().format(), 'bid(' + bid + ')>=ask(' + ask + ')']
-//      fs.appendFileSync(logfile, lm.join('/') + '\n')
-    console.log(lm.join('/'))
-  }
-}
 
 connect();
 
@@ -221,10 +208,11 @@ function get_book(pair) {
   return BOOK[pair.toUpperCase()];
 }
 
+// TODO: Move this function to a service
 function get_orderbook(pair) {
   pair = pair.replace(/[^a-zA-Z]/g, '').toUpperCase();
-  console.log(BOOK[pair]);
-  if (BOOK[pair].psnap && BOOK[pair]) {
+    
+  if (BOOK[pair].psnap) {
     result = { 
       'asks': BOOK[pair].psnap.asks[0],
       'bids': BOOK[pair].psnap.bids[0],
@@ -237,6 +225,6 @@ function get_orderbook(pair) {
   }
 
   return result;
-}
+} 
 
 module.exports = { get_book, get_orderbook }
