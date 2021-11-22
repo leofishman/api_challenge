@@ -1,19 +1,22 @@
 const api = require('./routes/api');
 const express = require('express');
-const config = require('config');
 const morgan = require('morgan');
-const debug = require('debug')('app');
 const app = express();
+const { books, BOOK } = require('./ws/book');
 
-app.use(express.json());//body 
+app.use(express.json());
 app.use(express.urlencoded({extended:true}));
 app.use(express.static('public'));
 app.use('/api/', api);
 
+const BTCUSD = books('BTCUSD')
+const ETHUSD = books('ETHUSD')
+console.log(16, BTCUSD, ETHUSD, BOOK);
+
+
 
 if(app.get('env') === 'development'){
     app.use(morgan('tiny'));
-    debug('Morgan enabled.');
 }
 
 app.get('/', (req, res) => {
