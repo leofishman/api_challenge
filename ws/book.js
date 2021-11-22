@@ -4,29 +4,37 @@ mkdir logs
 node bfx_test_book.js BTCUSD
 */
 
+// set the BOOK object with the proper values or error 
+
 const WS = require('ws')
 const _ = require('lodash')
-const async = require('async')
 const fs = require('fs')
 const moment = require('moment')
 const CRC = require('crc-32')
 
-const pair = "BTCUSD" //process.argv[2]
+// const pair = 'BTCUSD'; //process.argv[2]
 
 const conf = {
-  wshost: 'wss://api.bitfinex.com/ws/2'
+  wshost: "wss://api.bitfinex.com/ws/2"
 }
 
-const logfile = __dirname + '/logs/ws-book-aggr.log'
+const book = [];
 
-const BOOK = {}
+function get_book(pair) {
+  console.log(pair, BOOK);
+  return BOOK[pair];
+}
 
-console.log(pair, conf.wshost)
+let BOOK = [];
 
 let connected = false
 let connecting = false
 let cli
 let seq = null
+
+function get_pair_index(msg) {
+  return _.findKey(BOOK, (o) => { return o.channel_id === msg[0] });
+}
 
 function connect () {
   if (connecting || connected) return
@@ -35,15 +43,21 @@ function connect () {
   cli = new WS(conf.wshost, { /* rejectUnauthorized: false */ })
 
   cli.on('open', function open () {
-    console.log('WS open')
+    console.log('WS open ')
     connecting = false
     connected = true
-    BOOK.bids = {}
-    BOOK.asks = {}
-    BOOK.psnap = {}
-    BOOK.mcnt = 0
+
     cli.send(JSON.stringify({ event: 'conf', flags: 65536 + 131072 }))
-    cli.send(JSON.stringify({ event: 'subscribe', channel: 'book', pair: pair, prec: 'P0', len: 100 }))
+    global.validPairs.forEach( (pair) => {
+        console.log(pair, BOOK)
+        BOOK[pair] = {};
+        BOOK[pair].bids = {};
+        BOOK[pair].asks = {};
+        BOOK[pair].psnap = {};
+        BOOK[pair].mcnt = 0;
+        BOOK[pair].channel_id = 0;
+        cli.send(JSON.stringify({ event: 'subscribe', channel: 'book', pair: pair, prec: 'P0', len: 100 }));
+      });
   })
 
   cli.on('close', function open () {
@@ -55,6 +69,17 @@ function connect () {
 
   cli.on('message', function (msg) {
     msg = JSON.parse(msg)
+    if (msg.event == 'subscribed') {
+      BOOK[msg.pair].channel_id = msg.chanId;
+    }
+
+  // handle info events
+  // Info Codes
+
+  // 20051 : Stop/Restart Websocket Server (please reconnect)
+  // 20060 : Entering in Maintenance mode. Please pause any activity and resume after receiving the info message 20061 (it should take 120 seconds at most).
+  // 20061 : Maintenance ended. You can resume normal activity. It is advised to unsubscribe/subscribe again all channels.
+  // Only rely on 'CODE' for 'info' events
 
     if (msg.event) return
     if (msg[1] === 'hb') {
@@ -63,20 +88,24 @@ function connect () {
     } else if (msg[1] === 'cs') {
       seq = +msg[3]
 
+      // find which pair has channel_id in BOOK
+      const pair_index = get_pair_index(msg);
+      if (!pair_index) return
+
       const checksum = msg[2]
       const csdata = []
-      const bids_keys = BOOK.psnap['bids']
-      const asks_keys = BOOK.psnap['asks']
+      const bids_keys = BOOK[pair_index].psnap['bids']
+      const asks_keys = BOOK[pair_index].psnap['asks']
 
       for (let i = 0; i < 25; i++) {
         if (bids_keys[i]) {
           const price = bids_keys[i]
-          const pp = BOOK.bids[price]
+          const pp = BOOK[pair_index].bids[price]
           csdata.push(pp.price, pp.amount)
         }
         if (asks_keys[i]) {
           const price = asks_keys[i]
-          const pp = BOOK.asks[price]
+          const pp = BOOK[pair_index].asks[price]
           csdata.push(pp.price, -pp.amount)
         }
       }
@@ -84,7 +113,7 @@ function connect () {
       const cs_str = csdata.join(':')
       const cs_calc = CRC.str(cs_str)
 
-      fs.appendFileSync(logfile, '[' + moment().format('YYYY-MM-DDTHH:mm:ss.SSS') + '] ' + pair + ' | ' + JSON.stringify(['cs_string=' + cs_str, 'cs_calc=' + cs_calc, 'server_checksum=' + checksum]) + '\n')
+//        fs.appendFileSync(logfile, '[' + moment().format('YYYY-MM-DDTHH:mm:ss.SSS') + '] ' + pair + ' | ' + JSON.stringify(['cs_string=' + cs_str, 'cs_calc=' + cs_calc, 'server_checksum=' + checksum]) + '\n')
       if (cs_calc !== checksum) {
         console.error('CHECKSUM_FAILED')
         process.exit(-1)
@@ -92,17 +121,20 @@ function connect () {
       return
     }
 
-    fs.appendFileSync(logfile, '[' + moment().format('YYYY-MM-DDTHH:mm:ss.SSS') + '] ' + pair + ' | ' + JSON.stringify(msg) + '\n')
+//      fs.appendFileSync(logfile, '[' + moment().format('YYYY-MM-DDTHH:mm:ss.SSS') + '] ' + pair + ' | ' + JSON.stringify(msg) + '\n')
 
-    if (BOOK.mcnt === 0) {
+    // find which pair has channel_id in BOOK
+    const pair_index =  get_pair_index(msg);
+    if (!pair_index) return
+    if (BOOK[pair_index].mcnt === 0) {
       _.each(msg[1], function (pp) {
         pp = { price: pp[0], cnt: pp[1], amount: pp[2] }
         const side = pp.amount >= 0 ? 'bids' : 'asks'
         pp.amount = Math.abs(pp.amount)
-        if (BOOK[side][pp.price]) {
-          fs.appendFileSync(logfile, '[' + moment().format() + '] ' + pair + ' | ' + JSON.stringify(pp) + ' BOOK snap existing bid override\n')
+        if (BOOK[pair_index][side][pp.price]) {
+//            fs.appendFileSync(logfile, '[' + moment().format() + '] ' + pair + ' | ' + JSON.stringify(pp) + ' BOOK snap existing bid override\n')
         }
-        BOOK[side][pp.price] = pp
+        BOOK[pair_index][side][pp.price] = pp
       })
     } else {
       const cseq = +msg[2]
@@ -112,7 +144,7 @@ function connect () {
         seq = cseq - 1
       }
 
-      if (cseq - seq !== 1) {
+      if (cseq - seq > 2) {
         console.error('OUT OF SEQUENCE', seq, cseq)
         process.exit()
       }
@@ -125,31 +157,31 @@ function connect () {
         let found = true
 
         if (pp.amount > 0) {
-          if (BOOK['bids'][pp.price]) {
-            delete BOOK['bids'][pp.price]
+          if (BOOK[pair_index]['bids'][pp.price]) {
+            delete BOOK[pair_index]['bids'][pp.price]
           } else {
             found = false
           }
         } else if (pp.amount < 0) {
-          if (BOOK['asks'][pp.price]) {
-            delete BOOK['asks'][pp.price]
+          if (BOOK[pair_index]['asks'][pp.price]) {
+            delete BOOK[pair_index]['asks'][pp.price]
           } else {
             found = false
           }
         }
 
         if (!found) {
-          fs.appendFileSync(logfile, '[' + moment().format() + '] ' + pair + ' | ' + JSON.stringify(pp) + ' BOOK delete fail side not found\n')
+//            fs.appendFileSync(logfile, '[' + moment().format() + '] ' + pair + ' | ' + JSON.stringify(pp) + ' BOOK delete fail side not found\n')
         }
       } else {
         let side = pp.amount >= 0 ? 'bids' : 'asks'
         pp.amount = Math.abs(pp.amount)
-        BOOK[side][pp.price] = pp
+        BOOK[pair_index][side][pp.price] = pp
       }
     }
 
     _.each(['bids', 'asks'], function (side) {
-      let sbook = BOOK[side]
+      let sbook = BOOK[pair_index][side]
       let bprices = Object.keys(sbook)
 
       let prices = bprices.sort(function (a, b) {
@@ -160,11 +192,11 @@ function connect () {
         }
       })
 
-      BOOK.psnap[side] = prices
+      BOOK[pair_index].psnap[side] = prices
     })
 
-    BOOK.mcnt++
-    checkCross(msg)
+    BOOK[pair_index].mcnt++
+    // checkCross(msg)
   })
 }
 
@@ -178,22 +210,11 @@ function checkCross (msg) {
   let ask = BOOK.psnap.asks[0]
   if (bid >= ask) {
     let lm = [moment.utc().format(), 'bid(' + bid + ')>=ask(' + ask + ')']
-    fs.appendFileSync(logfile, lm.join('/') + '\n')
+//      fs.appendFileSync(logfile, lm.join('/') + '\n')
     console.log(lm.join('/'))
   }
 }
 
-function saveBook () {
-  const now = moment.utc().format('YYYYMMDDHHmmss')
-  fs.writeFileSync(__dirname + "/logs/tmp-ws-book-aggr-" + pair + '-' + now + '.log', JSON.stringify({ bids: BOOK.bids, asks: BOOK.asks}))
-}
+connect();
 
-setInterval(function () {
-  saveBook()
-}, 30000)
-
-books = (pair) => {
-  return pair;
-}
-
-module.exports = { BOOK, books };
+module.exports = { get_book }
