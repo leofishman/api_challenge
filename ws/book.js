@@ -1,4 +1,8 @@
-/*USAGE:
+/*
+Bitfinex ws Api from:
+https://docs.bitfinex.com/reference#ws-public-books
+
+USAGE:
 npm install ws lodash async moment crc-32
 mkdir logs
 node bfx_test_book.js BTCUSD
@@ -20,10 +24,6 @@ const conf = {
 
 const book = [];
 
-function get_book(pair) {
-  console.log(pair, BOOK);
-  return BOOK[pair];
-}
 
 let BOOK = [];
 
@@ -217,4 +217,26 @@ function checkCross (msg) {
 
 connect();
 
-module.exports = { get_book }
+function get_book(pair) {
+  return BOOK[pair.toUpperCase()];
+}
+
+function get_orderbook(pair) {
+  pair = pair.replace(/[^a-zA-Z]/g, '').toUpperCase();
+  console.log(BOOK[pair]);
+  if (BOOK[pair].psnap && BOOK[pair]) {
+    result = { 
+      'asks': BOOK[pair].psnap.asks[0],
+      'bids': BOOK[pair].psnap.bids[0],
+    }
+  } else {
+    result = {
+      'asks': 0,
+      'bids': 0,
+    } 
+  }
+
+  return result;
+}
+
+module.exports = { get_book, get_orderbook }
