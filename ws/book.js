@@ -49,7 +49,8 @@ function connect () {
     cli.send(JSON.stringify({ event: 'conf', flags: 65536 + 131072 }))
 
     // Subscribe to the orderbook for every pair
-    global.validPairs.forEach( (pair) => {
+    const validPairs =  process.env.validPairs.split(", ");
+    validPairs.forEach( (pair) => {
         BOOK[pair] = {};
         BOOK[pair].bids = {};
         BOOK[pair].asks = {};

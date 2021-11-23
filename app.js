@@ -5,10 +5,10 @@ const app = express();
 require('dotenv').config();
 
 // Move this to config module
-global.validPairs = [
-    'BTCUSD',
-    'ETHUSD'
-];
+// global.validPairs = [
+//     'BTCUSD',
+//     'ETHUSD'
+// ];
 
 app.use(express.json());
 app.use(express.urlencoded({extended:true}));

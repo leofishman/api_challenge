@@ -25,7 +25,8 @@ api.get('/orderbook/:pair', (req, res) => {
 
 function validatepair(pair){
     pair = pair.replace(/[^a-zA-Z]/g, '');
-    return global.validPairs.includes(pair.toUpperCase());
+    const validPairs =  process.env.validPairs.split(", ");
+    return validPairs.includes(pair.toUpperCase());
 }
 
 module.exports = api;
