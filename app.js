@@ -2,6 +2,7 @@ const api = require('./routes/api');
 const express = require('express');
 const morgan = require('morgan');
 const app = express();
+require('dotenv').config();
 
 // Move this to config module
 global.validPairs = [
@@ -25,7 +26,7 @@ app.get('/', (req, res) => {
 
 const port = process.env.PORT || 80;
 app.listen(port, () => {
-    console.log(`Listening on ${port}...`);
+    console.log(`Listening on ${port} ...`);
 })
 
 
