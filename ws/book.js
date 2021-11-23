@@ -14,6 +14,7 @@ const WS = require('ws')
 const _ = require('lodash')
 const moment = require('moment')
 const CRC = require('crc-32')
+const { result } = require('lodash')
 
 const conf = {
   wshost: "wss://api.bitfinex.com/ws/2"
@@ -146,11 +147,11 @@ function connect () {
         seq = cseq - 1
       }
 
-      if (cseq - seq !== 1) {
-        console.error('OUT OF SEQUENCE', seq, cseq);
+      if (cseq - seq !== 1 ) {
+        console.error('OUT OF SEQUENCE', seq, cseq, cseq - seq);
         connected = false;
         connecting = false;
-        process.exit()
+        // process.exit()
       }
 
       seq = cseq
@@ -209,9 +210,57 @@ setInterval(function () {
 
 connect();
 
-function get_price(op, pair, sizepair) {
-  return BOOK[pair.toUpperCase()];
+// TODO: Move this function to a service
+function get_price(op, pair, ordersize) {
+  let result = false;
+  let amount = 0;
+  if (connected) {
+    pair = pair.replace(/[^a-zA-Z]/g, '').toUpperCase();
+    op.includes('buy') ? op = 'bids' : op.includes('sell') ? op = 'asks' : result = {'error' : 'invalid operation'};
+    // check if order size is a float number
+    if (ordersize.match(/^[0-9]*\.?[0-9]+$/) && ordersize > 0) {
+        amount = parseFloat(ordersize);
+    } else {
+      result = {'error' : 'invalid order size'};
+    }
+
+    if (result) return result;
+
+    if (BOOK[pair] && BOOK[pair][op]) {
+      let price = 0;
+      let levels = 0;
+      // for each price in the book add the price until reaching the amount
+      _.forEach(BOOK[pair][op], function (pp) {
+        levels++;
+        if (amount > 0) {
+          if (amount >= pp.amount) {
+            amount -= pp.amount
+            price += pp.price * pp.amount
+          } else {
+            //TODO: Check that there is data in the orderbook
+            if (pp.price > 0) {
+              price += amount * pp.price
+              amount = 0
+            } else {
+              return {'error': 'no data'};
+            }
+          }
+        }
+      });
+      if (levels > 0) {
+        return price;
+      } else {
+        return {'error': 'no data'};
+      }    
+    } else {
+      return {'error': 'no data'};
+    }     
+  } else {
+    return {'error': 'not connected'}
+  }
+  
 }
+ 
 
 // TODO: Move this function to a service
 function get_orderbook(pair) {
@@ -219,18 +268,18 @@ function get_orderbook(pair) {
     pair = pair.replace(/[^a-zA-Z]/g, '').toUpperCase();
       
     if (BOOK[pair].psnap) {
-      result = { 
+      return { 
         'asks': BOOK[pair].psnap.asks[0],
         'bids': BOOK[pair].psnap.bids[0],
       }
     } else {
-      result = {
-        error: 'No orderbook available'
+      return {
+        'error': 'No orderbook available'
       } 
     }
   } else {
-    result = {
-      error: 'Not connected'
+    return {
+      'error': 'Not connected'
     }
   }
 

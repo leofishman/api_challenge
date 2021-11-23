@@ -10,7 +10,10 @@ api.get('/', (req, res) => {
 api.get('/price/:op/:pair/:size',(req, res) => {
     // Create function to get price 
     validatepair(req.params.pair)
-     ? res.json({'op': req.params.op,'pair': req.params.pair, 'size': req.params.size, 'pair': get_price(req.params.pair) }) 
+     ? res.json({
+         'op': req.params.op,'pair': req.params.pair, 'size': req.params.size,
+         'price (usd)': get_price( req.params.op, req.params.pair, req.params.size)
+     }) 
      : res.json({'error':'invalid pair'});
 });
 
@@ -22,7 +25,6 @@ api.get('/orderbook/:pair', (req, res) => {
 
 function validatepair(pair){
     pair = pair.replace(/[^a-zA-Z]/g, '');
-    console.log(pair);
     return global.validPairs.includes(pair.toUpperCase());
 }
 
