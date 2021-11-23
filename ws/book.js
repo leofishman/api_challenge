@@ -250,6 +250,9 @@ function get_price(op, pair, ordersize) {
         }
       });
       if (levels > 0) {
+        if (amount > 0) {
+          return {'error': 'no enoguh offer for this size'};
+        }
         return price;
       } else {
         return {'error': 'no data'};
