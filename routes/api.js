@@ -25,7 +25,7 @@ api.get('/orderbook/:pair', (req, res) => {
 
 function validatepair(pair){
     pair = pair.replace(/[^a-zA-Z]/g, '');
-    const validPairs =  process.env.validPairs.split(", ");
+    const validPairs =  process.env.validPairs ? process.env.validPairs.split(", ") : ['BTCUSD', 'ETHUSD'];
     return validPairs.includes(pair.toUpperCase());
 }
 
