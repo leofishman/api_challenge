@@ -15,9 +15,10 @@ const _ = require('lodash')
 const moment = require('moment')
 const CRC = require('crc-32')
 const { result } = require('lodash')
+require('dotenv').config();
 
 const conf = {
-  wshost: "wss://api.bitfinex.com/ws/2"
+  wshost:  process.env.EXCHANGE_WS_URL || 'wss://api.bitfinex.com/ws/2',
 }
 
 let BOOK = [];
