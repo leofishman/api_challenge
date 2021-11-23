@@ -121,7 +121,8 @@ function connect () {
         console.error('CHECKSUM_FAILED')
         connected = false;
         connecting = false;
-        process.exit(-1)
+        return;
+        // process.exit(-1)
       }
       connected = true;
       return
