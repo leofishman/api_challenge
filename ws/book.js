@@ -48,7 +48,6 @@ function connect () {
 
     // Subscribe to the orderbook for every pair
     global.validPairs.forEach( (pair) => {
-        console.log(pair, BOOK)
         BOOK[pair] = {};
         BOOK[pair].bids = {};
         BOOK[pair].asks = {};
@@ -84,6 +83,7 @@ function connect () {
 
     if (msg.event) return
     if (msg[1] === 'hb') {
+      connected = true;
       seq = +msg[2]
       return
     } else if (msg[1] === 'cs') {
@@ -116,8 +116,11 @@ function connect () {
 
       if (cs_calc !== checksum) {
         console.error('CHECKSUM_FAILED')
+        connected = false;
+        connecting = false;
         process.exit(-1)
       }
+      connected = true;
       return
     }
 
@@ -143,8 +146,10 @@ function connect () {
         seq = cseq - 1
       }
 
-      if (cseq - seq > 2) {
-        console.error('OUT OF SEQUENCE', seq, cseq)
+      if (cseq - seq !== 1) {
+        console.error('OUT OF SEQUENCE', seq, cseq);
+        connected = false;
+        connecting = false;
         process.exit()
       }
 
@@ -204,27 +209,32 @@ setInterval(function () {
 
 connect();
 
-function get_book(pair) {
+function get_price(op, pair, sizepair) {
   return BOOK[pair.toUpperCase()];
 }
 
 // TODO: Move this function to a service
 function get_orderbook(pair) {
-  pair = pair.replace(/[^a-zA-Z]/g, '').toUpperCase();
-    
-  if (BOOK[pair].psnap) {
-    result = { 
-      'asks': BOOK[pair].psnap.asks[0],
-      'bids': BOOK[pair].psnap.bids[0],
+  if (connected) {
+    pair = pair.replace(/[^a-zA-Z]/g, '').toUpperCase();
+      
+    if (BOOK[pair].psnap) {
+      result = { 
+        'asks': BOOK[pair].psnap.asks[0],
+        'bids': BOOK[pair].psnap.bids[0],
+      }
+    } else {
+      result = {
+        error: 'No orderbook available'
+      } 
     }
   } else {
     result = {
-      'asks': 0,
-      'bids': 0,
-    } 
+      error: 'Not connected'
+    }
   }
 
   return result;
 } 
 
-module.exports = { get_book, get_orderbook }
+module.exports = { get_price, get_orderbook }

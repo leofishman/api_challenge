@@ -1,6 +1,6 @@
 const express = require('express');
 const api = express.Router();
-const { get_book, get_orderbook } = require('../ws/book');
+const { get_price, get_orderbook } = require('../ws/book');
 
 
 api.get('/', (req, res) => {
@@ -10,7 +10,7 @@ api.get('/', (req, res) => {
 api.get('/price/:op/:pair/:size',(req, res) => {
     // Create function to get price 
     validatepair(req.params.pair)
-     ? res.json({'op': req.params.op,'pair': req.params.pair, 'size': req.params.size, 'pair': get_book(req.params.pair) }) 
+     ? res.json({'op': req.params.op,'pair': req.params.pair, 'size': req.params.size, 'pair': get_price(req.params.pair) }) 
      : res.json({'error':'invalid pair'});
 });
 
